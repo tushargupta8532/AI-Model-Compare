@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Model Atlas comparison catalog API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: models
+    description: AI model catalog and comparisons
+  - name: discovery
+    description: Glossary, changelog, and catalog summary
+  - name: feedback
+    description: Community corrections
 paths:
   /healthz:
     get:
@@ -24,6 +30,170 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /models:
+    get:
+      operationId: listModels
+      tags: [models]
+      summary: List and filter AI models
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: modality
+          in: query
+          schema:
+            type: string
+        - name: openWeights
+          in: query
+          schema:
+            type: boolean
+        - name: maxInputPrice
+          in: query
+          schema:
+            type: number
+        - name: minContext
+          in: query
+          schema:
+            type: number
+        - name: deployment
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, price, capability, context]
+            default: capability
+      responses:
+        "200":
+          description: Filtered model catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModelSummary"
+  /models/{slug}:
+    get:
+      operationId: getModel
+      tags: [models]
+      summary: Get a full model profile
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full model profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProfile"
+        "404":
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /compare:
+    get:
+      operationId: compareModels
+      tags: [models]
+      summary: Compare two to four models
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Comma-separated model slugs
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comparison payload
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModelProfile"
+        "400":
+          description: Invalid comparison request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog-summary:
+    get:
+      operationId: getCatalogSummary
+      tags: [discovery]
+      summary: Get catalog summary metrics
+      responses:
+        "200":
+          description: Catalog summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogSummary"
+  /glossary:
+    get:
+      operationId: listGlossary
+      tags: [discovery]
+      summary: List benchmark and AI terminology definitions
+      responses:
+        "200":
+          description: Glossary terms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GlossaryTerm"
+  /changelog:
+    get:
+      operationId: listChangelog
+      tags: [discovery]
+      summary: List recent catalog changes
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: number
+            default: 10
+      responses:
+        "200":
+          description: Recent changes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChangelogEntry"
+  /feedback:
+    post:
+      operationId: submitFeedback
+      tags: [feedback]
+      summary: Submit a correction for editorial review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "201":
+          description: Feedback received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackReceipt"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +203,267 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    CapabilityRating:
+      type: object
+      properties:
+        category:
+          type: string
+        score:
+          type: number
+          minimum: 1
+          maximum: 5
+        notes:
+          type: ["string", "null"]
+      required: [category, score]
+    BenchmarkScore:
+      type: object
+      properties:
+        benchmark:
+          type: string
+        score:
+          type: number
+        scoreUnit:
+          type: string
+        sourceUrl:
+          type: string
+        measuredAt:
+          type: string
+          format: date
+      required: [benchmark, score, scoreUnit, sourceUrl, measuredAt]
+    PricingTier:
+      type: object
+      properties:
+        tierName:
+          type: string
+        inputPricePerM:
+          type: ["number", "null"]
+        outputPricePerM:
+          type: ["number", "null"]
+        effectiveDate:
+          type: string
+          format: date
+        sourceUrl:
+          type: string
+      required: [tierName, inputPricePerM, outputPricePerM, effectiveDate, sourceUrl]
+    Provider:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        website:
+          type: string
+        logoMark:
+          type: string
+      required: [id, name, website, logoMark]
+    ModelSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        provider:
+          $ref: "#/components/schemas/Provider"
+        family:
+          type: string
+        modalities:
+          type: array
+          items:
+            type: string
+        contextWindow:
+          type: number
+        openWeights:
+          type: boolean
+        license:
+          type: string
+        capabilityScore:
+          type: number
+        inputPricePerM:
+          type: number
+        outputPricePerM:
+          type: number
+        complianceCerts:
+          type: array
+          items:
+            type: string
+        deploymentOptions:
+          type: array
+          items:
+            type: string
+        lastVerifiedAt:
+          type: string
+          format: date
+      required:
+        - id
+        - slug
+        - name
+        - provider
+        - family
+        - modalities
+        - contextWindow
+        - openWeights
+        - license
+        - capabilityScore
+        - inputPricePerM
+        - outputPricePerM
+        - complianceCerts
+        - deploymentOptions
+        - lastVerifiedAt
+    ModelProfile:
+      allOf:
+        - $ref: "#/components/schemas/ModelSummary"
+        - type: object
+          properties:
+            maxOutputTokens:
+              type: number
+            regionsAvailable:
+              type: array
+              items:
+                type: string
+            dataRetentionDays:
+              type: ["number", "null"]
+            trainingOptOut:
+              type: boolean
+            zeroDataRetention:
+              type: boolean
+            safetyPolicyUrl:
+              type: string
+            safetyNotes:
+              type: string
+            sdkLanguages:
+              type: array
+              items:
+                type: string
+            functionCalling:
+              type: boolean
+            fineTuningSupport:
+              type: boolean
+            sourceUrl:
+              type: string
+            capabilities:
+              type: array
+              items:
+                $ref: "#/components/schemas/CapabilityRating"
+            benchmarks:
+              type: array
+              items:
+                $ref: "#/components/schemas/BenchmarkScore"
+            pricing:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingTier"
+          required:
+            - maxOutputTokens
+            - regionsAvailable
+            - dataRetentionDays
+            - trainingOptOut
+            - zeroDataRetention
+            - safetyPolicyUrl
+            - safetyNotes
+            - sdkLanguages
+            - functionCalling
+            - fineTuningSupport
+            - sourceUrl
+            - capabilities
+            - benchmarks
+            - pricing
+    CatalogSummary:
+      type: object
+      properties:
+        modelCount:
+          type: number
+        providerCount:
+          type: number
+        benchmarkCount:
+          type: number
+        lastUpdated:
+          type: string
+          format: date
+        medianVerificationAgeDays:
+          type: number
+        priceTrend:
+          type: string
+        capabilityLeaders:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              model:
+                type: string
+              score:
+                type: number
+            required: [category, model, score]
+      required:
+        - modelCount
+        - providerCount
+        - benchmarkCount
+        - lastUpdated
+        - medianVerificationAgeDays
+        - priceTrend
+        - capabilityLeaders
+    GlossaryTerm:
+      type: object
+      properties:
+        term:
+          type: string
+        shortDefinition:
+          type: string
+        detail:
+          type: string
+        sourceUrl:
+          type: string
+      required: [term, shortDefinition, detail, sourceUrl]
+    ChangelogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [pricing, benchmark, model, methodology]
+        title:
+          type: string
+        summary:
+          type: string
+        affectedModels:
+          type: array
+          items:
+            type: string
+        sourceUrl:
+          type: string
+      required: [id, date, type, title, summary, affectedModels, sourceUrl]
+    FeedbackInput:
+      type: object
+      properties:
+        modelSlug:
+          type: string
+        field:
+          type: string
+        note:
+          type: string
+          minLength: 5
+      required: [modelSlug, field, note]
+    FeedbackReceipt:
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+      required: [id, message]
 

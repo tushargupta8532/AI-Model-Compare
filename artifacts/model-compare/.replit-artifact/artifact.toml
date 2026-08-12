@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Model Atlas"
+description = "A trusted AI model comparison workspace for developers, researchers, and product teams to evaluate capabilities, pricing, performance, deployment options, and compliance across leading models."
+version = "1.0.0"
+id = "artifacts/model-compare"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24187
+
+[services.development]
+run = "pnpm --filter @workspace/model-compare run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/model-compare", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/model-compare/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24187"
+BASE_PATH = "/"
